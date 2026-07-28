@@ -135,9 +135,14 @@ export class SyncEngine {
             deleted_at: raw.deletedAt || null,
           };
 
-      const { error } = await supabase.from(table).upsert(fullPayload as never);
+      const { error } = await supabase.from(table).upsert(fullPayload as never, { onConflict: 'id' });
 
       if (error) {
+        // If 409 Conflict or Duplicate Key error, record already exists in cloud -> treat as synced
+        if (error.code === '23505' || error.message.includes('409') || error.message.toLowerCase().includes('duplicate')) {
+          return;
+        }
+
         // Fallback: If missing extra columns in Supabase schema (e.g. photo_url/gender/recorded_by), retry with base schema!
         if (isCustomer) {
           const baseCustomerPayload = {
@@ -154,8 +159,8 @@ export class SyncEngine {
             updated_at: raw.updatedAt || new Date().toISOString(),
             version: raw.version || 1,
           };
-          const { error: baseErr } = await supabase.from(table).upsert(baseCustomerPayload as never);
-          if (baseErr) {
+          const { error: baseErr } = await supabase.from(table).upsert(baseCustomerPayload as never, { onConflict: 'id' });
+          if (baseErr && !baseErr.message.includes('409') && baseErr.code !== '23505') {
             throw new Error(`Cloud upsert error: ${baseErr.message}`);
           }
         } else {
@@ -173,8 +178,8 @@ export class SyncEngine {
             version: raw.version || 1,
             deleted_at: raw.deletedAt || null,
           };
-          const { error: baseTxnErr } = await supabase.from(table).upsert(baseTxnPayload as never);
-          if (baseTxnErr) {
+          const { error: baseTxnErr } = await supabase.from(table).upsert(baseTxnPayload as never, { onConflict: 'id' });
+          if (baseTxnErr && !baseTxnErr.message.includes('409') && baseTxnErr.code !== '23505') {
             throw new Error(`Cloud upsert error: ${baseTxnErr.message}`);
           }
         }
