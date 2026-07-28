@@ -101,7 +101,7 @@ export class SyncEngine {
     const raw = item.payload;
 
     if (item.operation === 'INSERT' || item.operation === 'UPDATE') {
-      const cloudPayload = isCustomer
+      const fullPayload = isCustomer
         ? {
             id: raw.id,
             name: raw.name,
@@ -135,9 +135,49 @@ export class SyncEngine {
             deleted_at: raw.deletedAt || null,
           };
 
-      const { error } = await supabase.from(table).upsert(cloudPayload as never);
+      const { error } = await supabase.from(table).upsert(fullPayload as never);
+
       if (error) {
-        throw new Error(`Cloud upsert error: ${error.message}`);
+        // Fallback: If missing extra columns in Supabase schema (e.g. photo_url/gender/recorded_by), retry with base schema!
+        if (isCustomer) {
+          const baseCustomerPayload = {
+            id: raw.id,
+            name: raw.name,
+            mobile: raw.mobile || '',
+            alternate_name: raw.alternateName || null,
+            address: raw.address || null,
+            opening_balance: raw.openingBalance || 0,
+            notes: raw.notes || null,
+            is_active: raw.isActive ?? true,
+            created_by: ensureValidUuid(raw.createdBy),
+            created_at: raw.createdAt || new Date().toISOString(),
+            updated_at: raw.updatedAt || new Date().toISOString(),
+            version: raw.version || 1,
+          };
+          const { error: baseErr } = await supabase.from(table).upsert(baseCustomerPayload as never);
+          if (baseErr) {
+            throw new Error(`Cloud upsert error: ${baseErr.message}`);
+          }
+        } else {
+          const baseTxnPayload = {
+            id: raw.id,
+            customer_id: raw.customerId,
+            type: raw.type,
+            amount: raw.amount,
+            payment_mode: raw.paymentMode || null,
+            description: raw.description || null,
+            transaction_date: raw.transactionDate,
+            created_by: ensureValidUuid(raw.createdBy),
+            created_at: raw.createdAt || new Date().toISOString(),
+            updated_at: raw.updatedAt || new Date().toISOString(),
+            version: raw.version || 1,
+            deleted_at: raw.deletedAt || null,
+          };
+          const { error: baseTxnErr } = await supabase.from(table).upsert(baseTxnPayload as never);
+          if (baseTxnErr) {
+            throw new Error(`Cloud upsert error: ${baseTxnErr.message}`);
+          }
+        }
       }
     } else if (item.operation === 'DELETE') {
       const { error } = await supabase.from(table).delete().eq('id', item.entityId);
