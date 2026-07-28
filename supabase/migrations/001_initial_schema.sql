@@ -46,6 +46,11 @@ CREATE TABLE IF NOT EXISTS public.transactions (
     deleted_at TIMESTAMPTZ
 );
 
+ALTER TABLE public.customers ADD COLUMN IF NOT EXISTS gender TEXT;
+ALTER TABLE public.customers ADD COLUMN IF NOT EXISTS photo_url TEXT;
+ALTER TABLE public.customers ADD COLUMN IF NOT EXISTS recorded_by TEXT;
+ALTER TABLE public.transactions ADD COLUMN IF NOT EXISTS recorded_by TEXT;
+
 -- 5. Activity Logs (Audit Trail)
 CREATE TABLE IF NOT EXISTS public.activity_logs (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),

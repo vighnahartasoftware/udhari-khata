@@ -24,7 +24,7 @@ export class LocalAuthAdapter implements IAuthAdapter {
 
     const profile: UserProfile = {
       id: DEMO_OWNER_PROFILE.id,
-      displayName: 'दर्शन अहिरे (मालक)',
+      displayName: 'बापू शिंदे (मालक)',
       role: 'owner',
       isActive: true,
       createdAt: new Date().toISOString(),
@@ -49,7 +49,7 @@ export class LocalAuthAdapter implements IAuthAdapter {
     if (cleanEmail === DEMO_OWNER_PROFILE.email && cleanPassword === DEMO_OWNER_PROFILE.password) {
       const profile: UserProfile = {
         id: DEMO_OWNER_PROFILE.id,
-        displayName: 'दर्शन अहिरे (मालक)',
+        displayName: 'बापू शिंदे (मालक)',
         role: 'owner',
         isActive: true,
         createdAt: new Date().toISOString(),
@@ -126,7 +126,7 @@ export class SupabaseAuthAdapter implements IAuthAdapter {
 
     const profile: UserProfile = {
       id: 'owner-darshan-ahire-001',
-      displayName: 'दर्शन अहिरे (मालक)',
+      displayName: 'बापू शिंदे (मालक)',
       role: 'owner',
       isActive: true,
       createdAt: new Date().toISOString(),

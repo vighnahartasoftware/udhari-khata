@@ -14,7 +14,7 @@ describe('Local Auth Adapter & Permissions', () => {
   it('authenticates with PIN 423203 successfully', async () => {
     const profile = await adapter.loginWithPin(APP_SECURITY_PIN);
     expect(profile.role).toBe('owner');
-    expect(profile.displayName).toContain('दर्शन अहिरे');
+    expect(profile.displayName).toContain('बापू शिंदे');
   });
 
   it('rejects invalid PIN', async () => {

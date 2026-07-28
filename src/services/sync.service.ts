@@ -5,11 +5,9 @@ import type { SyncQueueItem } from '@/types/domain';
 
 export class SyncEngine {
   private isProcessing = false;
-  private maxRetries = 5;
 
   /**
    * Enqueues a local operation for cloud sync.
-   * In local mode, sync engine stores item locally without attempting cloud push.
    */
   async enqueueOperation(
     entityType: 'customer' | 'transaction',
@@ -31,7 +29,7 @@ export class SyncEngine {
     const id = await db.syncQueue.add(itemData as SyncQueueItem);
     const item: SyncQueueItem = { ...itemData, id };
 
-    // Trigger processing if online and in Supabase mode
+    // Trigger immediate cloud push if online and in Supabase mode
     if (env.VITE_DATA_MODE === 'supabase' && typeof navigator !== 'undefined' && navigator.onLine) {
       void this.processQueue();
     }
@@ -63,23 +61,24 @@ export class SyncEngine {
         try {
           await this.syncItemToCloud(item);
           await db.syncQueue.delete(item.id);
+
+          // Update local status to synced
+          if (item.entityType === 'customer') {
+            await db.customers.update(item.entityId, { syncStatus: 'synced' });
+          } else if (item.entityType === 'transaction') {
+            await db.transactions.update(item.entityId, { syncStatus: 'synced' });
+          }
+
           processed++;
         } catch (err: unknown) {
           failed++;
           const errorMessage = err instanceof Error ? err.message : 'Unknown sync error';
           const newRetryCount = item.retryCount + 1;
 
-          if (newRetryCount >= this.maxRetries) {
-            await db.syncQueue.update(item.id, {
-              retryCount: newRetryCount,
-              lastError: `Max retries reached: ${errorMessage}`,
-            });
-          } else {
-            await db.syncQueue.update(item.id, {
-              retryCount: newRetryCount,
-              lastError: errorMessage,
-            });
-          }
+          await db.syncQueue.update(item.id, {
+            retryCount: newRetryCount,
+            lastError: errorMessage,
+          });
         }
       }
     } finally {
@@ -90,14 +89,54 @@ export class SyncEngine {
   }
 
   private async syncItemToCloud(item: SyncQueueItem): Promise<void> {
-    const table = item.entityType === 'customer' ? 'customers' : 'transactions';
+    const isCustomer = item.entityType === 'customer';
+    const table = isCustomer ? 'customers' : 'transactions';
+    const raw = item.payload;
 
     if (item.operation === 'INSERT' || item.operation === 'UPDATE') {
-      const { error } = await supabase.from(table).upsert(item.payload as never);
-      if (error) throw new Error(error.message);
+      const cloudPayload = isCustomer
+        ? {
+            id: raw.id,
+            name: raw.name,
+            mobile: raw.mobile || '',
+            alternate_name: raw.alternateName || null,
+            address: raw.address || null,
+            opening_balance: raw.openingBalance || 0,
+            notes: raw.notes || null,
+            is_active: raw.isActive ?? true,
+            gender: raw.gender || null,
+            photo_url: raw.photoUrl || null,
+            recorded_by: raw.recordedBy || null,
+            created_by: raw.createdBy || raw.id,
+            created_at: raw.createdAt || new Date().toISOString(),
+            updated_at: raw.updatedAt || new Date().toISOString(),
+            version: raw.version || 1,
+          }
+        : {
+            id: raw.id,
+            customer_id: raw.customerId,
+            type: raw.type,
+            amount: raw.amount,
+            payment_mode: raw.paymentMode || null,
+            description: raw.description || null,
+            recorded_by: raw.recordedBy || null,
+            transaction_date: raw.transactionDate,
+            created_by: raw.createdBy || raw.id,
+            created_at: raw.createdAt || new Date().toISOString(),
+            updated_at: raw.updatedAt || new Date().toISOString(),
+            version: raw.version || 1,
+            deleted_at: raw.deletedAt || null,
+          };
+
+      const { error } = await supabase.from(table).upsert(cloudPayload as never);
+      if (error) {
+        throw new Error(`Cloud upsert error: ${error.message}`);
+      }
     } else if (item.operation === 'DELETE') {
       const { error } = await supabase.from(table).delete().eq('id', item.entityId);
-      if (error) throw new Error(error.message);
+      if (error) {
+        throw new Error(`Cloud delete error: ${error.message}`);
+      }
     }
   }
 

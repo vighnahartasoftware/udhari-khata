@@ -46,6 +46,9 @@ export interface Database {
           opening_balance: number;
           notes: string | null;
           is_active: boolean;
+          gender: string | null;
+          photo_url: string | null;
+          recorded_by: string | null;
           created_by: string;
           created_at: string;
           updated_at: string;
@@ -60,6 +63,9 @@ export interface Database {
           opening_balance?: number;
           notes?: string | null;
           is_active?: boolean;
+          gender?: string | null;
+          photo_url?: string | null;
+          recorded_by?: string | null;
           created_by: string;
           created_at?: string;
           updated_at?: string;
@@ -74,6 +80,9 @@ export interface Database {
           opening_balance?: number;
           notes?: string | null;
           is_active?: boolean;
+          gender?: string | null;
+          photo_url?: string | null;
+          recorded_by?: string | null;
           created_by?: string;
           created_at?: string;
           updated_at?: string;
@@ -89,6 +98,7 @@ export interface Database {
           amount: number;
           payment_mode: string | null;
           description: string | null;
+          recorded_by: string | null;
           transaction_date: string;
           created_by: string;
           created_at: string;
@@ -103,6 +113,7 @@ export interface Database {
           amount: number;
           payment_mode?: string | null;
           description?: string | null;
+          recorded_by?: string | null;
           transaction_date: string;
           created_by: string;
           created_at?: string;
@@ -117,6 +128,7 @@ export interface Database {
           amount?: number;
           payment_mode?: string | null;
           description?: string | null;
+          recorded_by?: string | null;
           transaction_date?: string;
           created_by?: string;
           created_at?: string;

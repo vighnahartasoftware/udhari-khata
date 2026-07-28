@@ -59,7 +59,7 @@ export const AppLayout: React.FC = () => {
                 </span>
               </div>
               <p className="text-xs text-slate-400 font-bold leading-tight mt-0.5">
-                {user?.displayName || 'दर्शन अहिरे (मालक)'} •{' '}
+                {user?.displayName || 'बापू शिंदे (मालक)'} •{' '}
                 <span className="text-sky-400 uppercase tracking-wider">{user?.role || 'OWNER'}</span>
               </p>
             </div>
