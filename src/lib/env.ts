@@ -1,22 +1,19 @@
 import { z } from 'zod';
 
-const defaultDataMode =
-  typeof import.meta.env.VITE_SUPABASE_URL === 'string' &&
-  import.meta.env.VITE_SUPABASE_URL.startsWith('http')
-    ? 'supabase'
-    : 'local';
+const DEFAULT_SUPABASE_URL = 'https://qcwfzovkzycakjekxfxh.supabase.co';
+const DEFAULT_SUPABASE_ANON_KEY = 'sb_publishable_b5o9QiAFzsqdVFLRplYmew_COlWErL9';
 
 const envSchema = z
   .object({
     VITE_APP_NAME: z.string().default('Udhari Khata'),
-    VITE_APP_ENV: z.enum(['development', 'staging', 'production', 'test']).default('development'),
-    VITE_DATA_MODE: z.enum(['local', 'supabase']).default(defaultDataMode),
+    VITE_APP_ENV: z.enum(['development', 'staging', 'production', 'test']).default('production'),
+    VITE_DATA_MODE: z.enum(['local', 'supabase']).default('supabase'),
     VITE_ENABLE_PWA: z
       .string()
       .transform((val) => val === 'true')
       .default('true'),
-    VITE_SUPABASE_URL: z.string().optional().default(''),
-    VITE_SUPABASE_ANON_KEY: z.string().optional().default(''),
+    VITE_SUPABASE_URL: z.string().default(DEFAULT_SUPABASE_URL),
+    VITE_SUPABASE_ANON_KEY: z.string().default(DEFAULT_SUPABASE_ANON_KEY),
   })
   .superRefine((data, ctx) => {
     if (data.VITE_DATA_MODE === 'supabase') {
@@ -37,7 +34,16 @@ const envSchema = z
     }
   });
 
-const _env = envSchema.safeParse(import.meta.env);
+const rawEnv = {
+  VITE_APP_NAME: import.meta.env.VITE_APP_NAME || 'Udhari Khata',
+  VITE_APP_ENV: import.meta.env.VITE_APP_ENV || 'production',
+  VITE_DATA_MODE: import.meta.env.VITE_DATA_MODE || 'supabase',
+  VITE_ENABLE_PWA: import.meta.env.VITE_ENABLE_PWA || 'true',
+  VITE_SUPABASE_URL: import.meta.env.VITE_SUPABASE_URL || DEFAULT_SUPABASE_URL,
+  VITE_SUPABASE_ANON_KEY: import.meta.env.VITE_SUPABASE_ANON_KEY || DEFAULT_SUPABASE_ANON_KEY,
+};
+
+const _env = envSchema.safeParse(rawEnv);
 
 if (!_env.success) {
   console.error('❌ Invalid environment variables:', _env.error.format());
