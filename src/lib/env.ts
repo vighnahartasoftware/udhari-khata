@@ -1,10 +1,16 @@
 import { z } from 'zod';
 
+const defaultDataMode =
+  typeof import.meta.env.VITE_SUPABASE_URL === 'string' &&
+  import.meta.env.VITE_SUPABASE_URL.startsWith('http')
+    ? 'supabase'
+    : 'local';
+
 const envSchema = z
   .object({
     VITE_APP_NAME: z.string().default('Udhari Khata'),
     VITE_APP_ENV: z.enum(['development', 'staging', 'production', 'test']).default('development'),
-    VITE_DATA_MODE: z.enum(['local', 'supabase']).default('local'),
+    VITE_DATA_MODE: z.enum(['local', 'supabase']).default(defaultDataMode),
     VITE_ENABLE_PWA: z
       .string()
       .transform((val) => val === 'true')

@@ -3,6 +3,13 @@ import { supabase } from '@/lib/supabase';
 import { env } from '@/lib/env';
 import type { SyncQueueItem } from '@/types/domain';
 
+function ensureValidUuid(val: unknown): string {
+  if (typeof val === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(val)) {
+    return val;
+  }
+  return '00000000-0000-4000-a000-000000000001';
+}
+
 export class SyncEngine {
   private isProcessing = false;
 
@@ -107,7 +114,7 @@ export class SyncEngine {
             gender: raw.gender || null,
             photo_url: raw.photoUrl || null,
             recorded_by: raw.recordedBy || null,
-            created_by: raw.createdBy || raw.id,
+            created_by: ensureValidUuid(raw.createdBy),
             created_at: raw.createdAt || new Date().toISOString(),
             updated_at: raw.updatedAt || new Date().toISOString(),
             version: raw.version || 1,
@@ -121,7 +128,7 @@ export class SyncEngine {
             description: raw.description || null,
             recorded_by: raw.recordedBy || null,
             transaction_date: raw.transactionDate,
-            created_by: raw.createdBy || raw.id,
+            created_by: ensureValidUuid(raw.createdBy),
             created_at: raw.createdAt || new Date().toISOString(),
             updated_at: raw.updatedAt || new Date().toISOString(),
             version: raw.version || 1,

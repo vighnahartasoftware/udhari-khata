@@ -32,8 +32,12 @@ export async function clearDemoData(): Promise<void> {
 
 export async function runLocalSeedIfNeeded(forceReset = false): Promise<boolean> {
   if (env.VITE_DATA_MODE === 'supabase' && !forceReset) {
-    // In Supabase production cloud mode, wipe all dummy demo data from local IndexedDB
-    await clearDemoData();
+    const existingVersion = await db.appSettings.get('localSeedVersion');
+    if (existingVersion) {
+      await db.customers.where('id').startsWith('cust-').delete();
+      await db.transactions.where('id').startsWith('txn-').delete();
+      await db.appSettings.delete('localSeedVersion');
+    }
     return false;
   }
 

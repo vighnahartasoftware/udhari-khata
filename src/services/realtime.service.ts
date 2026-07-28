@@ -23,21 +23,29 @@ export function initializeRealtimeSubscriptions(): () => void {
     )
     .subscribe((status) => {
       if (status === 'SUBSCRIBED') {
-        // Fetch latest cloud state on subscribe to ensure 100% multi-device sync
         void syncLatestCloudData();
       }
     });
+
+  // Also trigger initial cloud fetch immediately
+  void syncLatestCloudData();
 
   return () => {
     void supabase.removeChannel(channel);
   };
 }
 
-async function syncLatestCloudData() {
+export async function syncLatestCloudData() {
   try {
     const { data: cloudCustomers } = await supabase.from('customers').select('*');
-    if (cloudCustomers && cloudCustomers.length > 0) {
+    if (cloudCustomers) {
+      const activeCloudIds = new Set<string>();
       for (const raw of cloudCustomers) {
+        if (!raw.is_active) {
+          await db.customers.delete(String(raw.id));
+          continue;
+        }
+        activeCloudIds.add(String(raw.id));
         const c: Customer = {
           id: String(raw.id),
           name: String(raw.name),
@@ -61,8 +69,12 @@ async function syncLatestCloudData() {
     }
 
     const { data: cloudTransactions } = await supabase.from('transactions').select('*');
-    if (cloudTransactions && cloudTransactions.length > 0) {
+    if (cloudTransactions) {
       for (const raw of cloudTransactions) {
+        if (raw.deleted_at) {
+          await db.transactions.delete(String(raw.id));
+          continue;
+        }
         const t: Transaction = {
           id: String(raw.id),
           customerId: String(raw.customer_id),
@@ -85,7 +97,7 @@ async function syncLatestCloudData() {
 
     await queryClient.invalidateQueries();
   } catch {
-    // Ignore offline errors during initial sync fetch
+    // Offline or network error fallback
   }
 }
 
@@ -94,18 +106,35 @@ async function handleCustomerRealtimeEvent(payload: {
   new?: Record<string, unknown>;
   old?: Record<string, unknown>;
 }) {
+  if (payload.eventType === 'DELETE' && payload.old && payload.old.id) {
+    const deletedId = String(payload.old.id);
+    await db.customers.delete(deletedId);
+    await queryClient.invalidateQueries();
+    useToastStore.getState().addToast({
+      type: 'info',
+      message: 'ग्राहक खाते काढून टाकले गेले (Deleted)',
+    });
+    return;
+  }
+
   if (!payload.new || !payload.new.id) return;
 
   const raw = payload.new;
-  const existingLocal = await db.customers.get(String(raw.id));
+  const targetId = String(raw.id);
 
-  // Deduplication check
+  if (!raw.is_active) {
+    await db.customers.delete(targetId);
+    await queryClient.invalidateQueries();
+    return;
+  }
+
+  const existingLocal = await db.customers.get(targetId);
   if (existingLocal && existingLocal.syncStatus === 'pending') {
     return;
   }
 
   const updatedCustomer: Customer = {
-    id: String(raw.id),
+    id: targetId,
     name: String(raw.name),
     mobile: String(raw.mobile || ''),
     alternateName: raw.alternate_name ? String(raw.alternate_name) : null,
@@ -137,18 +166,31 @@ async function handleTransactionRealtimeEvent(payload: {
   new?: Record<string, unknown>;
   old?: Record<string, unknown>;
 }) {
+  if (payload.eventType === 'DELETE' && payload.old && payload.old.id) {
+    const deletedId = String(payload.old.id);
+    await db.transactions.delete(deletedId);
+    await queryClient.invalidateQueries();
+    return;
+  }
+
   if (!payload.new || !payload.new.id) return;
 
   const raw = payload.new;
-  const existingLocal = await db.transactions.get(String(raw.id));
+  const targetId = String(raw.id);
 
-  // Deduplication check
+  if (raw.deleted_at) {
+    await db.transactions.delete(targetId);
+    await queryClient.invalidateQueries();
+    return;
+  }
+
+  const existingLocal = await db.transactions.get(targetId);
   if (existingLocal && existingLocal.syncStatus === 'pending') {
     return;
   }
 
   const updatedTransaction: Transaction = {
-    id: String(raw.id),
+    id: targetId,
     customerId: String(raw.customer_id),
     type: raw.type as 'credit' | 'payment',
     amount: Number(raw.amount || 0),
