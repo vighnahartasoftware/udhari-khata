@@ -135,17 +135,8 @@ export class SyncEngine {
             deleted_at: raw.deletedAt || null,
           };
 
-      const { error } = await supabase.from(table).upsert(fullPayload as never, { onConflict: 'id' });
-
-      if (error) {
-        // If 409 Conflict or Duplicate Key error, record already exists in cloud -> treat as synced
-        if (error.code === '23505' || error.message.includes('409') || error.message.toLowerCase().includes('duplicate')) {
-          return;
-        }
-
-        // Fallback: If missing extra columns in Supabase schema (e.g. photo_url/gender/recorded_by), retry with base schema!
-        if (isCustomer) {
-          const baseCustomerPayload = {
+      const basePayload = isCustomer
+        ? {
             id: raw.id,
             name: raw.name,
             mobile: raw.mobile || '',
@@ -158,13 +149,8 @@ export class SyncEngine {
             created_at: raw.createdAt || new Date().toISOString(),
             updated_at: raw.updatedAt || new Date().toISOString(),
             version: raw.version || 1,
-          };
-          const { error: baseErr } = await supabase.from(table).upsert(baseCustomerPayload as never, { onConflict: 'id' });
-          if (baseErr && !baseErr.message.includes('409') && baseErr.code !== '23505') {
-            throw new Error(`Cloud upsert error: ${baseErr.message}`);
           }
-        } else {
-          const baseTxnPayload = {
+        : {
             id: raw.id,
             customer_id: raw.customerId,
             type: raw.type,
@@ -178,9 +164,52 @@ export class SyncEngine {
             version: raw.version || 1,
             deleted_at: raw.deletedAt || null,
           };
-          const { error: baseTxnErr } = await supabase.from(table).upsert(baseTxnPayload as never, { onConflict: 'id' });
-          if (baseTxnErr && !baseTxnErr.message.includes('409') && baseTxnErr.code !== '23505') {
-            throw new Error(`Cloud upsert error: ${baseTxnErr.message}`);
+
+      // Check if entity already exists in Supabase PostgreSQL
+      const { data: existing } = await supabase
+        .from(table)
+        .select('id')
+        .eq('id', raw.id as string)
+        .maybeSingle();
+
+      if (existing) {
+        // Record exists in cloud -> Perform UPDATE
+        const { error: updateErr } = await supabase
+          .from(table)
+          .update(fullPayload as never)
+          .eq('id', raw.id as string);
+
+        if (updateErr) {
+          const { error: baseUpdateErr } = await supabase
+            .from(table)
+            .update(basePayload as never)
+            .eq('id', raw.id as string);
+
+          if (baseUpdateErr) {
+            throw new Error(`Cloud update error: ${baseUpdateErr.message}`);
+          }
+        }
+      } else {
+        // Record does NOT exist in cloud -> Perform INSERT
+        const { error: insertErr } = await supabase
+          .from(table)
+          .insert(fullPayload as never);
+
+        if (insertErr) {
+          const { error: baseInsertErr } = await supabase
+            .from(table)
+            .insert(basePayload as never);
+
+          if (baseInsertErr) {
+            // Handle duplicate key race condition gracefully
+            if (
+              baseInsertErr.code === '23505' ||
+              baseInsertErr.message.includes('409') ||
+              baseInsertErr.message.toLowerCase().includes('duplicate')
+            ) {
+              return;
+            }
+            throw new Error(`Cloud insert error: ${baseInsertErr.message}`);
           }
         }
       }
