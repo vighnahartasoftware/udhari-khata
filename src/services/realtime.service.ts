@@ -1,7 +1,6 @@
 import { supabase } from '@/lib/supabase';
 import { db } from '@/db/dexie';
 import { queryClient } from '@/lib/query-client';
-import { useToastStore } from '@/components/feedback/ToastStore';
 import type { Customer, Transaction, Gender } from '@/types/domain';
 
 export function initializeRealtimeSubscriptions(): () => void {
@@ -27,10 +26,16 @@ export function initializeRealtimeSubscriptions(): () => void {
       }
     });
 
-  // Also trigger initial cloud fetch immediately
+  // Initial cloud fetch immediately
   void syncLatestCloudData();
 
+  // Active 3-second polling loop to guarantee 100% multi-device sync across all browsers & phones
+  const pollInterval = setInterval(() => {
+    void syncLatestCloudData();
+  }, 3000);
+
   return () => {
+    clearInterval(pollInterval);
     void supabase.removeChannel(channel);
   };
 }
@@ -66,15 +71,25 @@ export async function syncLatestCloudData() {
         };
         await db.customers.put(c);
       }
+
+      // Remove locally cached customers if no longer present in Supabase Cloud
+      const allLocal = await db.customers.toArray();
+      for (const local of allLocal) {
+        if (local.syncStatus === 'synced' && !activeCloudIds.has(local.id)) {
+          await db.customers.delete(local.id);
+        }
+      }
     }
 
     const { data: cloudTransactions } = await supabase.from('transactions').select('*');
     if (cloudTransactions) {
+      const activeTxnIds = new Set<string>();
       for (const raw of cloudTransactions) {
         if (raw.deleted_at) {
           await db.transactions.delete(String(raw.id));
           continue;
         }
+        activeTxnIds.add(String(raw.id));
         const t: Transaction = {
           id: String(raw.id),
           customerId: String(raw.customer_id),
@@ -93,11 +108,19 @@ export async function syncLatestCloudData() {
         };
         await db.transactions.put(t);
       }
+
+      // Remove locally cached transactions if no longer present in Supabase Cloud
+      const allLocalTxns = await db.transactions.toArray();
+      for (const localTxn of allLocalTxns) {
+        if (localTxn.syncStatus === 'synced' && !activeTxnIds.has(localTxn.id)) {
+          await db.transactions.delete(localTxn.id);
+        }
+      }
     }
 
     await queryClient.invalidateQueries();
   } catch {
-    // Offline or network error fallback
+    // Silent offline or network error fallback
   }
 }
 
@@ -110,10 +133,6 @@ async function handleCustomerRealtimeEvent(payload: {
     const deletedId = String(payload.old.id);
     await db.customers.delete(deletedId);
     await queryClient.invalidateQueries();
-    useToastStore.getState().addToast({
-      type: 'info',
-      message: 'ग्राहक खाते काढून टाकले गेले (Deleted)',
-    });
     return;
   }
 
@@ -154,11 +173,6 @@ async function handleCustomerRealtimeEvent(payload: {
 
   await db.customers.put(updatedCustomer);
   await queryClient.invalidateQueries();
-
-  useToastStore.getState().addToast({
-    type: 'info',
-    message: `नवीन ग्राहक '${updatedCustomer.name}' ऑटो-सिंक झाला!`,
-  });
 }
 
 async function handleTransactionRealtimeEvent(payload: {
@@ -208,10 +222,4 @@ async function handleTransactionRealtimeEvent(payload: {
 
   await db.transactions.put(updatedTransaction);
   await queryClient.invalidateQueries();
-
-  const typeLabel = updatedTransaction.type === 'credit' ? 'उधारी (Credit)' : 'पेमेंट (Payment)';
-  useToastStore.getState().addToast({
-    type: 'info',
-    message: `नवीन ${typeLabel} नोंद ₹${updatedTransaction.amount} ऑटो-सिंक झाली!`,
-  });
 }

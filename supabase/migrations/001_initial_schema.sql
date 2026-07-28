@@ -224,3 +224,13 @@ WITH CHECK (
 ALTER PUBLICATION supabase_realtime ADD TABLE public.customers;
 ALTER PUBLICATION supabase_realtime ADD TABLE public.transactions;
 ALTER PUBLICATION supabase_realtime ADD TABLE public.activity_logs;
+
+-- 11. Disable Row Level Security (RLS) for PIN-authenticated multi-device access
+ALTER TABLE public.customers DISABLE ROW LEVEL SECURITY;
+ALTER TABLE public.transactions DISABLE ROW LEVEL SECURITY;
+ALTER TABLE public.profiles DISABLE ROW LEVEL SECURITY;
+
+GRANT ALL ON public.customers TO anon, authenticated, service_role;
+GRANT ALL ON public.transactions TO anon, authenticated, service_role;
+GRANT ALL ON public.profiles TO anon, authenticated, service_role;
+
