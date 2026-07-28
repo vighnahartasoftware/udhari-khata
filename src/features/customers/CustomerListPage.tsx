@@ -5,13 +5,30 @@ import { db } from '@/db/dexie';
 import { calculateCustomerBalance } from '@/utils/balance';
 import { formatCurrency } from '@/utils';
 import { AddCustomerModal } from './AddCustomerModal';
-import { Search, UserPlus, Phone, MapPin, ChevronRight, Sparkles, User, LayoutGrid, List } from 'lucide-react';
+import { localCustomerRepository } from '@/services/customer.local.repository';
+import { useToastStore } from '@/components/feedback/ToastStore';
+import {
+  Search,
+  UserPlus,
+  Phone,
+  MapPin,
+  ChevronRight,
+  Sparkles,
+  User,
+  LayoutGrid,
+  List,
+  Trash2,
+} from 'lucide-react';
+import type { Customer } from '@/types/domain';
 
 export const CustomerListPage: React.FC = () => {
   const navigate = useNavigate();
+  const { addToast } = useToastStore();
+
   const [searchQuery, setSearchQuery] = useState('');
   const [isAddCustomerOpen, setIsAddCustomerOpen] = useState(false);
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
+  const [deletingCustomer, setDeletingCustomer] = useState<Customer | null>(null);
 
   const customers = useLiveQuery(() => db.customers.filter((c) => Boolean(c.isActive)).toArray(), []) || [];
   const transactions = useLiveQuery(() => db.transactions.filter((t) => t.deletedAt === null).toArray(), []) || [];
@@ -26,6 +43,21 @@ export const CustomerListPage: React.FC = () => {
       return nameMatch || altMatch || mobileMatch;
     })
     .sort((a, b) => a.name.localeCompare(b.name, 'mr-IN'));
+
+  const handleDeleteCustomer = async () => {
+    if (!deletingCustomer) return;
+    try {
+      await localCustomerRepository.delete(deletingCustomer.id);
+      addToast({
+        type: 'success',
+        message: `ग्राहक '${deletingCustomer.name}' खात्यातून काढून टाकला! (Customer deleted)`,
+      });
+      setDeletingCustomer(null);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'ग्राहक डीलीट करताना त्रुटी आली';
+      addToast({ type: 'error', message: msg });
+    }
+  };
 
   return (
     <div className="space-y-5 pb-24" data-testid="customer-list-page">
@@ -94,7 +126,7 @@ export const CustomerListPage: React.FC = () => {
         </div>
       ) : viewMode === 'grid' ? (
         /* Zoom App Video-Grid Style Layout */
-        <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+        <div className="grid grid-cols-2 md:grid-cols-3 gap-3.5">
           {filtered.map((customer) => {
             const bal = calculateCustomerBalance(customer, transactions);
             const isFemale = customer.gender === 'female';
@@ -104,10 +136,23 @@ export const CustomerListPage: React.FC = () => {
               <div
                 key={customer.id}
                 onClick={() => navigate(`/customers/${customer.id}`)}
-                className="glass-card glass-card-hover p-4 rounded-3xl flex flex-col items-center justify-between cursor-pointer transition-all space-y-3 relative overflow-hidden text-center border-slate-800"
+                className="glass-card glass-card-hover p-4 rounded-3xl flex flex-col items-center justify-between cursor-pointer transition-all space-y-3 relative overflow-hidden group text-center border-slate-800/90 hover:border-sky-500/50 shadow-2xl"
               >
+                {/* Delete Icon Button */}
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setDeletingCustomer(customer);
+                  }}
+                  title="ग्राहक डीलीट करा"
+                  className="absolute top-3 right-3 p-1.5 rounded-xl bg-slate-950/80 hover:bg-rose-950/90 text-slate-400 hover:text-rose-300 transition-all opacity-0 group-hover:opacity-100 z-10"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                </button>
+
                 {/* Zoom Box Photo Frame */}
-                <div className="relative w-20 h-20 rounded-2xl overflow-hidden bg-slate-800 border-2 border-slate-700/80 group-hover:border-sky-400/80 transition-all shrink-0 shadow-lg">
+                <div className="relative w-20 h-20 rounded-2xl overflow-hidden bg-slate-900 border-2 border-slate-700/80 group-hover:border-sky-400 group-hover:scale-105 transition-all shrink-0 shadow-xl">
                   {customer.photoUrl ? (
                     <img
                       src={customer.photoUrl}
@@ -119,7 +164,7 @@ export const CustomerListPage: React.FC = () => {
                       {customer.name.charAt(0)}
                     </div>
                   )}
-                  <span className="absolute bottom-0 right-0 px-1.5 py-0.5 text-[10px] bg-slate-950/90 font-bold rounded-tl-lg">
+                  <span className="absolute bottom-0 right-0 px-1.5 py-0.5 text-[10px] bg-slate-950/90 font-bold rounded-tl-lg border-t border-l border-slate-800">
                     {isFemale ? '♀️' : '♂️'}
                   </span>
                 </div>
@@ -131,7 +176,7 @@ export const CustomerListPage: React.FC = () => {
                     {customer.mobile || 'मोबाईल नोंद नाही'}
                   </p>
 
-                  <div className="inline-flex items-center space-x-1 px-2.5 py-0.5 bg-slate-900 border border-slate-800 rounded-full text-[10px] text-slate-400 font-semibold">
+                  <div className="inline-flex items-center space-x-1 px-2.5 py-0.5 bg-slate-900 border border-slate-800 rounded-full text-[10px] text-slate-400 font-extrabold">
                     <User className="w-3 h-3 text-sky-400" />
                     <span>नोंदणी: {recorderName}</span>
                   </div>
@@ -146,7 +191,7 @@ export const CustomerListPage: React.FC = () => {
                   >
                     {formatCurrency(bal)}
                   </span>
-                  <div className="w-6 h-6 rounded-lg bg-slate-800/80 flex items-center justify-center text-slate-400">
+                  <div className="w-6 h-6 rounded-lg bg-slate-800/80 flex items-center justify-center text-slate-400 group-hover:text-sky-400 transition-colors">
                     <ChevronRight className="w-3.5 h-3.5" />
                   </div>
                 </div>
@@ -165,7 +210,7 @@ export const CustomerListPage: React.FC = () => {
               <div
                 key={customer.id}
                 onClick={() => navigate(`/customers/${customer.id}`)}
-                className="glass-card glass-card-hover p-4 rounded-2xl flex items-center justify-between cursor-pointer transition-all space-x-3"
+                className="glass-card glass-card-hover p-4 rounded-2xl flex items-center justify-between cursor-pointer transition-all space-x-3 group"
               >
                 <div className="flex items-center space-x-3.5 min-w-0">
                   <div className="w-12 h-12 rounded-2xl bg-slate-800 border border-slate-700/80 overflow-hidden flex items-center justify-center font-black text-sky-400 text-base shadow-md shrink-0">
@@ -217,13 +262,57 @@ export const CustomerListPage: React.FC = () => {
                       {bal > 0 ? 'उधारी बाकी' : 'निल'}
                     </p>
                   </div>
-                  <div className="w-7 h-7 rounded-xl bg-slate-800/80 border border-slate-750 flex items-center justify-center text-slate-400">
-                    <ChevronRight className="w-4 h-4" />
-                  </div>
+
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setDeletingCustomer(customer);
+                    }}
+                    title="ग्राहक डीलीट करा"
+                    className="p-2 rounded-xl bg-slate-900 hover:bg-rose-950/80 text-slate-400 hover:text-rose-300 transition-colors"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </button>
                 </div>
               </div>
             );
           })}
+        </div>
+      )}
+
+      {/* Delete Customer Confirmation Modal */}
+      {deletingCustomer && (
+        <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-slate-900 border border-slate-700/80 rounded-3xl max-w-sm w-full p-5 space-y-4 text-center shadow-2xl">
+            <div className="w-12 h-12 rounded-2xl bg-rose-500/20 text-rose-400 flex items-center justify-center mx-auto font-bold">
+              <Trash2 className="w-6 h-6" />
+            </div>
+
+            <div>
+              <h4 className="text-base font-bold text-slate-100">ग्राहक डीलीट करायचा आहे का?</h4>
+              <p className="text-xs text-slate-400 mt-1">
+                ग्राहक <span className="font-bold text-rose-300">'{deletingCustomer.name}'</span> यांचे खाते यादीतून काढले जाईल.
+              </p>
+            </div>
+
+            <div className="flex items-center justify-center space-x-2 pt-2 border-t border-slate-800">
+              <button
+                type="button"
+                onClick={() => setDeletingCustomer(null)}
+                className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-bold rounded-xl transition-colors"
+              >
+                रद्द करा (Cancel)
+              </button>
+              <button
+                type="button"
+                onClick={() => void handleDeleteCustomer()}
+                className="px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold rounded-xl transition-colors shadow-lg shadow-rose-600/30"
+              >
+                डीलीट करा (Delete)
+              </button>
+            </div>
+          </div>
         </div>
       )}
 

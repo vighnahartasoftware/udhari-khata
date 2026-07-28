@@ -5,6 +5,7 @@ import { db } from '@/db/dexie';
 import { calculateCustomerTotals } from '@/utils/balance';
 import { formatCurrency } from '@/utils';
 import { exportCustomerLedgerToCSV } from '@/utils/csvExport';
+import { localCustomerRepository } from '@/services/customer.local.repository';
 import { localTransactionRepository } from '@/services/transaction.local.repository';
 import { AddCreditModal } from '../transactions/AddCreditModal';
 import { AddPaymentModal } from '../transactions/AddPaymentModal';
@@ -33,6 +34,7 @@ export const CustomerDetailPage: React.FC = () => {
   const [isCreditOpen, setIsCreditOpen] = useState(false);
   const [isPaymentOpen, setIsPaymentOpen] = useState(false);
   const [deletingTxnId, setDeletingTxnId] = useState<string | null>(null);
+  const [isDeleteCustomerOpen, setIsDeleteCustomerOpen] = useState(false);
 
   const customer = useLiveQuery(
     () => (customerId ? db.customers.get(customerId) : undefined),
@@ -76,6 +78,21 @@ export const CustomerDetailPage: React.FC = () => {
     }
   };
 
+  const handleDeleteCustomerAccount = async () => {
+    try {
+      await localCustomerRepository.delete(customer.id);
+      addToast({
+        type: 'success',
+        message: `ग्राहक '${customer.name}' चे खाते डीलीट झाले!`,
+      });
+      setIsDeleteCustomerOpen(false);
+      navigate('/customers', { replace: true });
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'ग्राहक डीलीट करताना त्रुटी';
+      addToast({ type: 'error', message: msg });
+    }
+  };
+
   return (
     <div className="space-y-4 pb-20" data-testid="customer-detail-page">
       {/* Top Bar */}
@@ -86,13 +103,24 @@ export const CustomerDetailPage: React.FC = () => {
         >
           <ArrowLeft className="w-4.5 h-4.5" />
         </button>
-        <button
-          onClick={() => exportCustomerLedgerToCSV(customer, allTransactions)}
-          className="flex items-center space-x-1.5 px-3.5 py-2 bg-slate-900 border border-slate-800 text-slate-200 rounded-xl text-xs font-bold hover:bg-slate-800 transition-all shadow-sm"
-        >
-          <Download className="w-4 h-4 text-sky-400" />
-          <span>स्टेटमेंट CSV</span>
-        </button>
+
+        <div className="flex items-center space-x-2">
+          <button
+            onClick={() => setIsDeleteCustomerOpen(true)}
+            className="flex items-center space-x-1.5 px-3 py-2 bg-rose-950/80 border border-rose-800/60 text-rose-300 rounded-xl text-xs font-bold hover:bg-rose-900 transition-all shadow-sm"
+          >
+            <Trash2 className="w-4 h-4 text-rose-400" />
+            <span>ग्राहक खाते डीलीट</span>
+          </button>
+
+          <button
+            onClick={() => exportCustomerLedgerToCSV(customer, allTransactions)}
+            className="flex items-center space-x-1.5 px-3.5 py-2 bg-slate-900 border border-slate-800 text-slate-200 rounded-xl text-xs font-bold hover:bg-slate-800 transition-all shadow-sm"
+          >
+            <Download className="w-4 h-4 text-sky-400" />
+            <span>CSV</span>
+          </button>
+        </div>
       </header>
 
       {/* Customer Info Header Card (Zoom Photo Box Style) */}
@@ -298,7 +326,7 @@ export const CustomerDetailPage: React.FC = () => {
         )}
       </div>
 
-      {/* Delete Confirmation Modal */}
+      {/* Delete Transaction Confirmation Modal */}
       {deletingTxnId && (
         <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4">
           <div className="bg-slate-900 border border-slate-700 rounded-2xl max-w-xs w-full p-4 space-y-3 text-center">
@@ -316,6 +344,41 @@ export const CustomerDetailPage: React.FC = () => {
                 className="px-3 py-1.5 bg-rose-600 hover:bg-rose-700 text-white text-xs font-semibold rounded-lg"
               >
                 डीलीट करा
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Entire Customer Account Confirmation Modal */}
+      {isDeleteCustomerOpen && (
+        <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-slate-900 border border-slate-700/80 rounded-3xl max-w-sm w-full p-5 space-y-4 text-center shadow-2xl">
+            <div className="w-12 h-12 rounded-2xl bg-rose-500/20 text-rose-400 flex items-center justify-center mx-auto font-bold">
+              <Trash2 className="w-6 h-6" />
+            </div>
+
+            <div>
+              <h4 className="text-base font-bold text-slate-100">ग्राहक खाते डीलीट करायचे आहे का?</h4>
+              <p className="text-xs text-slate-400 mt-1">
+                ग्राहक <span className="font-bold text-rose-300">'{customer.name}'</span> यांचे खाते आणि सर्व व्यवहार इतिहास डीलीट केला जाईल.
+              </p>
+            </div>
+
+            <div className="flex items-center justify-center space-x-2 pt-2 border-t border-slate-800">
+              <button
+                type="button"
+                onClick={() => setIsDeleteCustomerOpen(false)}
+                className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-bold rounded-xl transition-colors"
+              >
+                रद्द करा (Cancel)
+              </button>
+              <button
+                type="button"
+                onClick={() => void handleDeleteCustomerAccount()}
+                className="px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold rounded-xl transition-colors shadow-lg shadow-rose-600/30"
+              >
+                होय, डीलीट करा (Delete Account)
               </button>
             </div>
           </div>
