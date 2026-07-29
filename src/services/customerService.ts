@@ -7,7 +7,6 @@ export async function getCustomers(): Promise<Customer[]> {
   try {
     if (typeof navigator !== 'undefined' && navigator.onLine) {
       const cloudData = await cloudCustomerRepository.getAll();
-      // Cache fresh data locally
       for (const c of cloudData) {
         await db.customers.put(c);
       }
@@ -40,13 +39,15 @@ export async function createCustomer(data: Omit<Customer, 'createdAt' | 'updated
   const isOnline = typeof navigator !== 'undefined' && navigator.onLine;
 
   if (isOnline) {
-    // 1. Direct write to Supabase (Single Source of Truth)
-    const created = await cloudCustomerRepository.create(data);
-    // 2. Cache in IndexedDB as synced
-    await db.customers.put(created);
-    return created;
+    try {
+      const created = await cloudCustomerRepository.create(data);
+      await db.customers.put(created);
+      return created;
+    } catch (err) {
+      console.warn('Direct cloud customer creation encountered an issue, saving locally & queuing for background sync:', err);
+      return localCustomerRepository.create(data);
+    }
   } else {
-    // Save locally for offline sync
     return localCustomerRepository.create(data);
   }
 }
@@ -55,9 +56,14 @@ export async function updateCustomer(id: string, updates: Partial<Customer>): Pr
   const isOnline = typeof navigator !== 'undefined' && navigator.onLine;
 
   if (isOnline) {
-    const updated = await cloudCustomerRepository.update(id, updates);
-    await db.customers.put(updated);
-    return updated;
+    try {
+      const updated = await cloudCustomerRepository.update(id, updates);
+      await db.customers.put(updated);
+      return updated;
+    } catch (err) {
+      console.warn('Direct cloud customer update encountered an issue, updating locally & queuing for sync:', err);
+      return localCustomerRepository.update(id, updates);
+    }
   } else {
     return localCustomerRepository.update(id, updates);
   }
@@ -67,8 +73,13 @@ export async function deleteCustomer(id: string): Promise<void> {
   const isOnline = typeof navigator !== 'undefined' && navigator.onLine;
 
   if (isOnline) {
-    await cloudCustomerRepository.delete(id);
-    await db.customers.delete(id);
+    try {
+      await cloudCustomerRepository.delete(id);
+      await db.customers.delete(id);
+    } catch (err) {
+      console.warn('Direct cloud customer delete encountered an issue, marking deleted locally & queuing for sync:', err);
+      await localCustomerRepository.delete(id);
+    }
   } else {
     await localCustomerRepository.delete(id);
   }

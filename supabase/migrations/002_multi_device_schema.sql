@@ -1,7 +1,7 @@
 -- Migration 002: Safe Multi-Device Ledger Schema, Realtime & SQL View
 -- Database: PostgreSQL (Supabase)
 
--- 1. Enable UUID extension
+-- 1. Enable UUID extensions
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 CREATE EXTENSION IF NOT EXISTS "pgcrypto";
 
@@ -41,7 +41,17 @@ CREATE TABLE IF NOT EXISTS public.transactions (
     deleted_at TIMESTAMPTZ
 );
 
--- 4. Add Missing Columns safely if table already existed
+-- 4. FIX: Remove strict Foreign Key constraints on created_by so anon PIN access works without foreign key errors!
+ALTER TABLE public.customers DROP CONSTRAINT IF EXISTS customers_created_by_fkey;
+ALTER TABLE public.transactions DROP CONSTRAINT IF EXISTS transactions_created_by_fkey;
+
+ALTER TABLE public.customers ALTER COLUMN created_by DROP NOT NULL;
+ALTER TABLE public.transactions ALTER COLUMN created_by DROP NOT NULL;
+
+ALTER TABLE public.customers ALTER COLUMN created_by SET DEFAULT '00000000-0000-4000-a000-000000000001'::uuid;
+ALTER TABLE public.transactions ALTER COLUMN created_by SET DEFAULT '00000000-0000-4000-a000-000000000001'::uuid;
+
+-- 5. Add Missing Columns safely if table already existed from migration 001
 DO $$ 
 BEGIN
     IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='customers' AND column_name='gender') THEN
@@ -61,7 +71,7 @@ BEGIN
     END IF;
 END $$;
 
--- 5. High-Performance Query Indexes
+-- 6. High-Performance Query Indexes
 CREATE INDEX IF NOT EXISTS idx_customers_name ON public.customers(name);
 CREATE INDEX IF NOT EXISTS idx_customers_mobile ON public.customers(mobile);
 CREATE INDEX IF NOT EXISTS idx_customers_updated_at ON public.customers(updated_at);
@@ -72,7 +82,7 @@ CREATE INDEX IF NOT EXISTS idx_transactions_transaction_date ON public.transacti
 CREATE INDEX IF NOT EXISTS idx_transactions_created_at ON public.transactions(created_at);
 CREATE INDEX IF NOT EXISTS idx_transactions_deleted_at ON public.transactions(deleted_at);
 
--- 6. Trigger Function for Updated At
+-- 7. Trigger Function for Updated At
 CREATE OR REPLACE FUNCTION public.handle_updated_at()
 RETURNS TRIGGER AS $$
 BEGIN
@@ -94,7 +104,7 @@ CREATE TRIGGER trg_transactions_updated_at
 BEFORE UPDATE ON public.transactions
 FOR EACH ROW EXECUTE FUNCTION public.handle_updated_at();
 
--- 7. SQL View for Real-Time Customer Balances & Totals
+-- 8. SQL View for Real-Time Customer Balances & Totals
 CREATE OR REPLACE VIEW public.customer_balances_summary AS
 SELECT 
     c.id AS customer_id,
@@ -111,7 +121,7 @@ LEFT JOIN public.transactions t ON c.id = t.customer_id
 WHERE c.is_active = true
 GROUP BY c.id, c.name, c.mobile, c.opening_balance;
 
--- 8. Enable Realtime Replication
+-- 9. Enable Realtime Replication
 DO $$
 BEGIN
   IF NOT EXISTS (
@@ -129,7 +139,7 @@ BEGIN
   END IF;
 END $$;
 
--- 9. Row Level Security & Permissions
+-- 10. Row Level Security & Permissions
 ALTER TABLE public.customers ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.transactions ENABLE ROW LEVEL SECURITY;
 
@@ -150,3 +160,6 @@ WITH CHECK (true);
 GRANT ALL ON public.customers TO anon, authenticated, service_role;
 GRANT ALL ON public.transactions TO anon, authenticated, service_role;
 GRANT SELECT ON public.customer_balances_summary TO anon, authenticated, service_role;
+
+-- 11. Notify PostgREST to reload schema cache
+NOTIFY pgrst, 'reload schema';

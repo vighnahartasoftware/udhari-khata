@@ -29,27 +29,47 @@ export class CloudCustomerRepository implements CustomerRepository {
   }
 
   async create(data: Omit<Customer, 'createdAt' | 'updatedAt'>): Promise<Customer> {
+    const payload: Record<string, unknown> = {
+      id: data.id,
+      name: data.name,
+      mobile: data.mobile || '',
+      alternate_name: data.alternateName || null,
+      address: data.address || null,
+      opening_balance: data.openingBalance || 0,
+      notes: data.notes || null,
+      is_active: data.isActive ?? true,
+      gender: data.gender || null,
+      photo_url: data.photoUrl || null,
+      recorded_by: data.recordedBy || null,
+      version: data.version || 1,
+    };
+
+    if (data.createdBy && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(data.createdBy)) {
+      payload.created_by = data.createdBy;
+    }
+
     const { data: created, error } = await supabase
       .from('customers')
-      .insert({
-        id: data.id,
-        name: data.name,
-        mobile: data.mobile,
-        alternate_name: data.alternateName,
-        address: data.address,
-        opening_balance: data.openingBalance,
-        notes: data.notes,
-        is_active: data.isActive,
-        gender: data.gender || null,
-        photo_url: data.photoUrl || null,
-        recorded_by: data.recordedBy || null,
-        created_by: data.createdBy,
-        version: data.version,
-      })
+      .insert(payload as never)
       .select()
       .single();
 
-    if (error) throw error;
+    if (error) {
+      if (payload.created_by) {
+        delete payload.created_by;
+        const { data: createdFallback, error: fallbackErr } = await supabase
+          .from('customers')
+          .insert(payload as never)
+          .select()
+          .single();
+
+        if (!fallbackErr && createdFallback) {
+          return this.mapToDomain(createdFallback as Record<string, unknown>);
+        }
+      }
+      throw error;
+    }
+
     return this.mapToDomain(created as Record<string, unknown>);
   }
 
@@ -96,9 +116,9 @@ export class CloudCustomerRepository implements CustomerRepository {
       openingBalance: Number(row.opening_balance || 0),
       notes: row.notes ? String(row.notes) : null,
       isActive: Boolean(row.is_active),
-      createdBy: String(row.created_by),
-      createdAt: String(row.created_at),
-      updatedAt: String(row.updated_at),
+      createdBy: String(row.created_by || ''),
+      createdAt: String(row.created_at || new Date().toISOString()),
+      updatedAt: String(row.updated_at || new Date().toISOString()),
       version: Number(row.version || 1),
       syncStatus: 'synced',
     };

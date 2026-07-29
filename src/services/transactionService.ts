@@ -44,9 +44,14 @@ export async function addCreditTransaction(data: Omit<Transaction, 'createdAt' |
   };
 
   if (isOnline) {
-    const created = await cloudTransactionRepository.create(payload);
-    await db.transactions.put(created);
-    return created;
+    try {
+      const created = await cloudTransactionRepository.create(payload);
+      await db.transactions.put(created);
+      return created;
+    } catch (err) {
+      console.warn('Direct cloud credit transaction creation encountered an issue, saving locally & queuing for background sync:', err);
+      return localTransactionRepository.create(payload);
+    }
   } else {
     return localTransactionRepository.create(payload);
   }
@@ -61,9 +66,14 @@ export async function addPaymentTransaction(data: Omit<Transaction, 'createdAt' 
   };
 
   if (isOnline) {
-    const created = await cloudTransactionRepository.create(payload);
-    await db.transactions.put(created);
-    return created;
+    try {
+      const created = await cloudTransactionRepository.create(payload);
+      await db.transactions.put(created);
+      return created;
+    } catch (err) {
+      console.warn('Direct cloud payment transaction creation encountered an issue, saving locally & queuing for background sync:', err);
+      return localTransactionRepository.create(payload);
+    }
   } else {
     return localTransactionRepository.create(payload);
   }
@@ -73,9 +83,14 @@ export async function updateTransaction(id: string, updates: Partial<Transaction
   const isOnline = typeof navigator !== 'undefined' && navigator.onLine;
 
   if (isOnline) {
-    const updated = await cloudTransactionRepository.update(id, updates);
-    await db.transactions.put(updated);
-    return updated;
+    try {
+      const updated = await cloudTransactionRepository.update(id, updates);
+      await db.transactions.put(updated);
+      return updated;
+    } catch (err) {
+      console.warn('Direct cloud transaction update encountered an issue, updating locally & queuing for sync:', err);
+      return localTransactionRepository.update(id, updates);
+    }
   } else {
     return localTransactionRepository.update(id, updates);
   }
@@ -85,8 +100,13 @@ export async function deleteTransaction(id: string): Promise<void> {
   const isOnline = typeof navigator !== 'undefined' && navigator.onLine;
 
   if (isOnline) {
-    await cloudTransactionRepository.deleteSoft(id);
-    await db.transactions.delete(id);
+    try {
+      await cloudTransactionRepository.deleteSoft(id);
+      await db.transactions.delete(id);
+    } catch (err) {
+      console.warn('Direct cloud transaction delete encountered an issue, deleting locally & queuing for sync:', err);
+      await localTransactionRepository.deleteSoft(id);
+    }
   } else {
     await localTransactionRepository.deleteSoft(id);
   }

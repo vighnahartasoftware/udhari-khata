@@ -33,24 +33,44 @@ export class CloudTransactionRepository implements TransactionRepository {
   }
 
   async create(data: Omit<Transaction, 'createdAt' | 'updatedAt'>): Promise<Transaction> {
+    const payload: Record<string, unknown> = {
+      id: data.id,
+      customer_id: data.customerId,
+      type: data.type,
+      amount: data.amount,
+      payment_mode: data.paymentMode || null,
+      description: data.description || null,
+      recorded_by: data.recordedBy || null,
+      transaction_date: data.transactionDate,
+      version: data.version || 1,
+    };
+
+    if (data.createdBy && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(data.createdBy)) {
+      payload.created_by = data.createdBy;
+    }
+
     const { data: created, error } = await supabase
       .from('transactions')
-      .insert({
-        id: data.id,
-        customer_id: data.customerId,
-        type: data.type,
-        amount: data.amount,
-        payment_mode: data.paymentMode,
-        description: data.description,
-        recorded_by: data.recordedBy || null,
-        transaction_date: data.transactionDate,
-        created_by: data.createdBy,
-        version: data.version,
-      })
+      .insert(payload as never)
       .select()
       .single();
 
-    if (error) throw error;
+    if (error) {
+      if (payload.created_by) {
+        delete payload.created_by;
+        const { data: createdFallback, error: fallbackErr } = await supabase
+          .from('transactions')
+          .insert(payload as never)
+          .select()
+          .single();
+
+        if (!fallbackErr && createdFallback) {
+          return this.mapToDomain(createdFallback as Record<string, unknown>);
+        }
+      }
+      throw error;
+    }
+
     return this.mapToDomain(created as Record<string, unknown>);
   }
 
@@ -93,9 +113,9 @@ export class CloudTransactionRepository implements TransactionRepository {
       description: row.description ? String(row.description) : null,
       recordedBy: row.recorded_by ? String(row.recorded_by) : null,
       transactionDate: String(row.transaction_date),
-      createdBy: String(row.created_by),
-      createdAt: String(row.created_at),
-      updatedAt: String(row.updated_at),
+      createdBy: String(row.created_by || ''),
+      createdAt: String(row.created_at || new Date().toISOString()),
+      updatedAt: String(row.updated_at || new Date().toISOString()),
       version: Number(row.version || 1),
       syncStatus: 'synced',
       deletedAt: row.deleted_at ? String(row.deleted_at) : null,
