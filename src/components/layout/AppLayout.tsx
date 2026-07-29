@@ -1,10 +1,11 @@
 import React, { useEffect, useState } from 'react';
 import { Outlet, NavLink } from 'react-router-dom';
-import { LayoutDashboard, Users, BarChart3, Settings, WifiOff, Store, CloudCheck } from 'lucide-react';
+import { LayoutDashboard, Users, BarChart3, Settings, WifiOff, CloudCheck } from 'lucide-react';
 import { ToastContainer } from '../feedback/Toast';
 import { PWAUpdatePrompt } from '../feedback/PWAUpdatePrompt';
 import { initializeRealtimeSubscriptions } from '@/services/realtime.service';
 import { useAuthStore } from '@/store/authStore';
+import { BrandLogo } from '@/components/common/BrandLogo';
 
 export const AppLayout: React.FC = () => {
   const { user } = useAuthStore();
@@ -39,11 +40,7 @@ export const AppLayout: React.FC = () => {
         <div className="max-w-2xl mx-auto flex items-center justify-between">
           <div className="flex items-center space-x-3">
             <div className="relative group cursor-pointer">
-              <div className="w-11 h-11 rounded-2xl bg-gradient-to-br from-sky-400 via-indigo-500 to-emerald-400 p-[2px] shadow-lg shadow-sky-500/25 glow-sky transition-transform group-hover:scale-105">
-                <div className="w-full h-full bg-slate-950 rounded-[14px] flex items-center justify-center text-sky-400 font-black">
-                  <Store className="w-5.5 h-5.5 text-sky-400" />
-                </div>
-              </div>
+              <BrandLogo size={44} variant="mark" className="transition-transform group-hover:scale-105" />
               <span className="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 bg-emerald-400 border-2 border-slate-950 rounded-full animate-ping" />
               <span className="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 bg-emerald-500 border-2 border-slate-950 rounded-full" />
             </div>

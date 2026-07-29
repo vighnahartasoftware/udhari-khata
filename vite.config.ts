@@ -9,13 +9,13 @@ export default defineConfig({
     react(),
     VitePWA({
       registerType: 'autoUpdate',
-      includeAssets: ['favicon.ico', 'apple-touch-icon.png', 'icons/*.png'],
+      includeAssets: ['favicon.ico', 'favicon.svg', 'favicon-32x32.png', 'icons/*.png', 'icons/*.svg'],
       manifest: {
-        name: 'Udhari Khata',
-        short_name: 'Udhari',
+        name: 'उधारी खाता - Udhari Khata',
+        short_name: 'उधारी खाता',
         description: 'Mobile-first credit ledger and shop balance management application',
-        theme_color: '#0f172a',
-        background_color: '#0f172a',
+        theme_color: '#0c2340',
+        background_color: '#0c2340',
         display: 'standalone',
         orientation: 'portrait',
         scope: '/',

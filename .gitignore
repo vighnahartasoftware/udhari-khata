@@ -30,3 +30,7 @@ playwright-report
 *.njsproj
 *.sln
 *.sw?
+
+# Scratch & Temporary
+scratch/
+

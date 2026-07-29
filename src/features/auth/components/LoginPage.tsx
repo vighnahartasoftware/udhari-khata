@@ -3,7 +3,8 @@ import { useNavigate } from 'react-router-dom';
 import { getAuthAdapter } from '@/services/auth.adapter';
 import { useAuthStore } from '@/store/authStore';
 import { useToastStore } from '@/components/feedback/ToastStore';
-import { Store, Lock, Delete, ArrowRight, Loader2, KeyRound } from 'lucide-react';
+import { Lock, Delete, ArrowRight, Loader2, KeyRound } from 'lucide-react';
+import { BrandLogo } from '@/components/common/BrandLogo';
 
 export const LoginPage: React.FC = () => {
   const navigate = useNavigate();
@@ -93,11 +94,9 @@ export const LoginPage: React.FC = () => {
 
       <div className="w-full max-w-sm glass-card p-6 md:p-8 rounded-3xl shadow-2xl space-y-6 relative z-10 border-slate-800/90 glow-sky text-center">
         {/* Header Branding */}
-        <div className="space-y-2">
-          <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-sky-500 via-indigo-500 to-emerald-400 p-[2px] mx-auto shadow-xl shadow-sky-500/25 glow-sky animate-pulse-glow">
-            <div className="w-full h-full bg-slate-950 rounded-[14px] flex items-center justify-center text-white">
-              <Store className="w-8 h-8 text-sky-400" />
-            </div>
+        <div className="space-y-3">
+          <div className="flex justify-center">
+            <BrandLogo size={72} variant="mark" className="drop-shadow-2xl hover:scale-105 transition-transform" />
           </div>
 
           <div>
