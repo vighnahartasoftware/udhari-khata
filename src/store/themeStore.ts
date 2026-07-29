@@ -10,7 +10,7 @@ interface ThemeState {
 
 const getInitialTheme = (): ThemeMode => {
   if (typeof window === 'undefined') return 'dark';
-  const saved = localStorage.getItem('app_theme');
+  const saved = window.localStorage.getItem('app_theme');
   if (saved === 'light' || saved === 'dark') {
     return saved;
   }
@@ -29,7 +29,9 @@ const applyThemeToDOM = (theme: ThemeMode) => {
     root.classList.add('dark');
     root.style.colorScheme = 'dark';
   }
-  localStorage.setItem('app_theme', theme);
+  if (typeof window !== 'undefined') {
+    window.localStorage.setItem('app_theme', theme);
+  }
 };
 
 // Apply initial theme immediately on module load

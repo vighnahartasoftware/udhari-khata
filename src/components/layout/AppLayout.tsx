@@ -32,6 +32,19 @@ export const AppLayout: React.FC = () => {
     };
   }, []);
 
+  useEffect(() => {
+    const root = document.documentElement;
+    if (theme === 'light') {
+      root.classList.remove('dark');
+      root.classList.add('light');
+      root.style.colorScheme = 'light';
+    } else {
+      root.classList.remove('light');
+      root.classList.add('dark');
+      root.style.colorScheme = 'dark';
+    }
+  }, [theme]);
+
   return (
     <div className="flex flex-col min-h-screen bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 pb-28 md:pb-6 selection:bg-sky-500 selection:text-white transition-colors duration-200">
       {/* Toast Notification Mount Point */}
