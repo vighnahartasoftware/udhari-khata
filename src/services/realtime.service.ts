@@ -4,6 +4,7 @@ import { queryClient } from '@/lib/query-client';
 import type { Customer, Transaction, Gender } from '@/types/domain';
 
 export function initializeRealtimeSubscriptions(): () => void {
+  // Subscribe to public postgres_changes for real-time multi-device sync
   const channel = supabase
     .channel('public:udhari_khata_realtime')
     .on(
@@ -26,13 +27,13 @@ export function initializeRealtimeSubscriptions(): () => void {
       }
     });
 
-  // Initial cloud fetch immediately
+  // Fetch initial cloud state immediately
   void syncLatestCloudData();
 
-  // Active 3-second polling loop to guarantee 100% multi-device sync across all browsers & phones
+  // Active 4-second background poll to guarantee 100% sync even if socket disconnects briefly
   const pollInterval = setInterval(() => {
     void syncLatestCloudData();
-  }, 3000);
+  }, 4000);
 
   return () => {
     clearInterval(pollInterval);
@@ -42,6 +43,8 @@ export function initializeRealtimeSubscriptions(): () => void {
 
 export async function syncLatestCloudData() {
   try {
+    if (typeof navigator !== 'undefined' && !navigator.onLine) return;
+
     const { data: cloudCustomers } = await supabase.from('customers').select('*');
     if (cloudCustomers) {
       const activeCloudIds = new Set<string>();
@@ -72,7 +75,7 @@ export async function syncLatestCloudData() {
         await db.customers.put(c);
       }
 
-      // Remove locally cached customers if no longer present in Supabase Cloud
+      // Purge local cache rows no longer in cloud
       const allLocal = await db.customers.toArray();
       for (const local of allLocal) {
         if (local.syncStatus === 'synced' && !activeCloudIds.has(local.id)) {
@@ -109,7 +112,6 @@ export async function syncLatestCloudData() {
         await db.transactions.put(t);
       }
 
-      // Remove locally cached transactions if no longer present in Supabase Cloud
       const allLocalTxns = await db.transactions.toArray();
       for (const localTxn of allLocalTxns) {
         if (localTxn.syncStatus === 'synced' && !activeTxnIds.has(localTxn.id)) {
@@ -119,8 +121,11 @@ export async function syncLatestCloudData() {
     }
 
     await queryClient.invalidateQueries();
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new globalThis.Event('udhari-data-updated'));
+    }
   } catch {
-    // Silent offline or network error fallback
+    // Network offline fallback
   }
 }
 
@@ -133,6 +138,7 @@ async function handleCustomerRealtimeEvent(payload: {
     const deletedId = String(payload.old.id);
     await db.customers.delete(deletedId);
     await queryClient.invalidateQueries();
+    if (typeof window !== 'undefined') window.dispatchEvent(new globalThis.Event('udhari-data-updated'));
     return;
   }
 
@@ -144,11 +150,7 @@ async function handleCustomerRealtimeEvent(payload: {
   if (!raw.is_active) {
     await db.customers.delete(targetId);
     await queryClient.invalidateQueries();
-    return;
-  }
-
-  const existingLocal = await db.customers.get(targetId);
-  if (existingLocal && existingLocal.syncStatus === 'pending') {
+    if (typeof window !== 'undefined') window.dispatchEvent(new globalThis.Event('udhari-data-updated'));
     return;
   }
 
@@ -173,6 +175,7 @@ async function handleCustomerRealtimeEvent(payload: {
 
   await db.customers.put(updatedCustomer);
   await queryClient.invalidateQueries();
+  if (typeof window !== 'undefined') window.dispatchEvent(new globalThis.Event('udhari-data-updated'));
 }
 
 async function handleTransactionRealtimeEvent(payload: {
@@ -184,6 +187,7 @@ async function handleTransactionRealtimeEvent(payload: {
     const deletedId = String(payload.old.id);
     await db.transactions.delete(deletedId);
     await queryClient.invalidateQueries();
+    if (typeof window !== 'undefined') window.dispatchEvent(new globalThis.Event('udhari-data-updated'));
     return;
   }
 
@@ -195,11 +199,7 @@ async function handleTransactionRealtimeEvent(payload: {
   if (raw.deleted_at) {
     await db.transactions.delete(targetId);
     await queryClient.invalidateQueries();
-    return;
-  }
-
-  const existingLocal = await db.transactions.get(targetId);
-  if (existingLocal && existingLocal.syncStatus === 'pending') {
+    if (typeof window !== 'undefined') window.dispatchEvent(new globalThis.Event('udhari-data-updated'));
     return;
   }
 
@@ -222,4 +222,5 @@ async function handleTransactionRealtimeEvent(payload: {
 
   await db.transactions.put(updatedTransaction);
   await queryClient.invalidateQueries();
+  if (typeof window !== 'undefined') window.dispatchEvent(new globalThis.Event('udhari-data-updated'));
 }

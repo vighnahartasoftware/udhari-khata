@@ -4,10 +4,13 @@ import { router } from './router';
 import { AppProviders } from './providers';
 import { PWAUpdatePrompt } from '@/components/feedback/PWAUpdatePrompt';
 import { runLocalSeedIfNeeded } from '@/db/seed';
+import { runOneTimeLegacyDataMigration } from '@/services/migration.service';
 
 export const App: React.FC = () => {
   useEffect(() => {
-    void runLocalSeedIfNeeded();
+    void runLocalSeedIfNeeded().then(() => {
+      void runOneTimeLegacyDataMigration();
+    });
 
     // In local development mode, unregister any stale service workers from preview runs
     if (import.meta.env.DEV && typeof navigator !== 'undefined' && 'serviceWorker' in navigator) {

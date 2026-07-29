@@ -1,11 +1,9 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useLiveQuery } from 'dexie-react-hooks';
-import { db } from '@/db/dexie';
-import { calculateCustomerBalance } from '@/utils/balance';
+import { useRealtimeData } from '@/hooks/useRealtimeData';
 import { formatCurrency } from '@/utils';
 import { AddCustomerModal } from './AddCustomerModal';
-import { localCustomerRepository } from '@/services/customer.local.repository';
+import { deleteCustomer } from '@/services/customerService';
 import { useToastStore } from '@/components/feedback/ToastStore';
 import {
   Search,
@@ -30,8 +28,7 @@ export const CustomerListPage: React.FC = () => {
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
   const [deletingCustomer, setDeletingCustomer] = useState<Customer | null>(null);
 
-  const customers = useLiveQuery(() => db.customers.filter((c) => Boolean(c.isActive)).toArray(), []) || [];
-  const transactions = useLiveQuery(() => db.transactions.filter((t) => t.deletedAt === null).toArray(), []) || [];
+  const { customers, calculateBalance } = useRealtimeData();
 
   const filtered = customers
     .filter((c) => {
@@ -47,7 +44,7 @@ export const CustomerListPage: React.FC = () => {
   const handleDeleteCustomer = async () => {
     if (!deletingCustomer) return;
     try {
-      await localCustomerRepository.delete(deletingCustomer.id);
+      await deleteCustomer(deletingCustomer.id);
       addToast({
         type: 'success',
         message: `ग्राहक '${deletingCustomer.name}' खात्यातून काढून टाकला! (Customer deleted)`,
@@ -128,7 +125,7 @@ export const CustomerListPage: React.FC = () => {
         /* Zoom App Video-Grid Style Layout */
         <div className="grid grid-cols-2 md:grid-cols-3 gap-3.5">
           {filtered.map((customer) => {
-            const bal = calculateCustomerBalance(customer, transactions);
+            const bal = calculateBalance(customer);
             const isFemale = customer.gender === 'female';
             const recorderName = customer.recordedBy === 'nikhil' ? 'निखिल' : 'विवेक';
 
@@ -203,7 +200,7 @@ export const CustomerListPage: React.FC = () => {
         /* Classic List View */
         <div className="space-y-2.5">
           {filtered.map((customer) => {
-            const bal = calculateCustomerBalance(customer, transactions);
+            const bal = calculateBalance(customer);
             const recorderName = customer.recordedBy === 'nikhil' ? 'निखिल' : 'विवेक';
 
             return (

@@ -40,6 +40,9 @@ export class CloudCustomerRepository implements CustomerRepository {
         opening_balance: data.openingBalance,
         notes: data.notes,
         is_active: data.isActive,
+        gender: data.gender || null,
+        photo_url: data.photoUrl || null,
+        recorded_by: data.recordedBy || null,
         created_by: data.createdBy,
         version: data.version,
       })
@@ -59,6 +62,9 @@ export class CloudCustomerRepository implements CustomerRepository {
     if (updates.openingBalance !== undefined) updateData.opening_balance = updates.openingBalance;
     if (updates.notes !== undefined) updateData.notes = updates.notes;
     if (updates.isActive !== undefined) updateData.is_active = updates.isActive;
+    if (updates.gender !== undefined) updateData.gender = updates.gender;
+    if (updates.photoUrl !== undefined) updateData.photo_url = updates.photoUrl;
+    if (updates.recordedBy !== undefined) updateData.recorded_by = updates.recordedBy;
     if (updates.version !== undefined) updateData.version = updates.version;
 
     const { data: updated, error } = await supabase
@@ -81,9 +87,12 @@ export class CloudCustomerRepository implements CustomerRepository {
     return {
       id: String(row.id),
       name: String(row.name),
-      mobile: String(row.mobile),
+      mobile: String(row.mobile || ''),
       alternateName: row.alternate_name ? String(row.alternate_name) : null,
       address: row.address ? String(row.address) : null,
+      gender: (row.gender as 'male' | 'female') || null,
+      photoUrl: row.photo_url ? String(row.photo_url) : null,
+      recordedBy: row.recorded_by ? String(row.recorded_by) : null,
       openingBalance: Number(row.opening_balance || 0),
       notes: row.notes ? String(row.notes) : null,
       isActive: Boolean(row.is_active),

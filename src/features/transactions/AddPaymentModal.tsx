@@ -4,8 +4,8 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { X, CheckCircle2, AlertTriangle, UserCheck } from 'lucide-react';
 import type { Customer, PaymentMode } from '@/types/domain';
-import { localCustomerRepository } from '@/services/customer.local.repository';
-import { localTransactionRepository } from '@/services/transaction.local.repository';
+import { getCustomers } from '@/services/customerService';
+import { addPaymentTransaction, getCustomerTransactions } from '@/services/transactionService';
 import { calculateCustomerBalance } from '@/utils/balance';
 import { useAuthStore } from '@/store/authStore';
 import { useToastStore } from '@/components/feedback/ToastStore';
@@ -65,7 +65,7 @@ export const AddPaymentModal: React.FC<Props> = ({
 
   useEffect(() => {
     if (isOpen) {
-      localCustomerRepository.getAll().then((list) => {
+      getCustomers().then((list) => {
         setCustomers(list);
         if (preselectedCustomerId) {
           setValue('customerId', preselectedCustomerId);
@@ -78,7 +78,7 @@ export const AddPaymentModal: React.FC<Props> = ({
     if (watchedCustomerId) {
       const selected = customers.find((c) => c.id === watchedCustomerId);
       if (selected) {
-        localTransactionRepository.getByCustomerId(selected.id).then((txns) => {
+        getCustomerTransactions(selected.id).then((txns) => {
           const bal = calculateCustomerBalance(selected, txns);
           setSelectedCustomerBalance(bal);
         });
@@ -92,10 +92,9 @@ export const AddPaymentModal: React.FC<Props> = ({
 
   const savePayment = async (data: PaymentFormData) => {
     const creatorId = user?.id || globalThis.crypto.randomUUID();
-    await localTransactionRepository.create({
+    await addPaymentTransaction({
       id: globalThis.crypto.randomUUID(),
       customerId: data.customerId,
-      type: 'payment',
       amount: Number(data.amount),
       paymentMode: data.paymentMode as PaymentMode,
       description: data.description?.trim() || null,
@@ -103,7 +102,7 @@ export const AddPaymentModal: React.FC<Props> = ({
       transactionDate: new Date(data.transactionDate).toISOString(),
       createdBy: creatorId,
       version: 1,
-      syncStatus: 'pending',
+      syncStatus: 'synced',
       deletedAt: null,
     });
 

@@ -4,8 +4,8 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { X, PlusCircle, UserCheck } from 'lucide-react';
 import type { Customer } from '@/types/domain';
-import { localCustomerRepository } from '@/services/customer.local.repository';
-import { localTransactionRepository } from '@/services/transaction.local.repository';
+import { getCustomers } from '@/services/customerService';
+import { addCreditTransaction } from '@/services/transactionService';
 import { useAuthStore } from '@/store/authStore';
 import { useToastStore } from '@/components/feedback/ToastStore';
 
@@ -58,7 +58,7 @@ export const AddCreditModal: React.FC<Props> = ({
 
   useEffect(() => {
     if (isOpen) {
-      localCustomerRepository.getAll().then((list) => {
+      getCustomers().then((list) => {
         setCustomers(list);
         if (preselectedCustomerId) {
           setValue('customerId', preselectedCustomerId);
@@ -72,10 +72,9 @@ export const AddCreditModal: React.FC<Props> = ({
   const onSubmit = async (data: CreditFormData) => {
     try {
       const creatorId = user?.id || globalThis.crypto.randomUUID();
-      await localTransactionRepository.create({
+      await addCreditTransaction({
         id: globalThis.crypto.randomUUID(),
         customerId: data.customerId,
-        type: 'credit',
         amount: Number(data.amount),
         paymentMode: null,
         description: data.description?.trim() || null,
@@ -83,7 +82,7 @@ export const AddCreditModal: React.FC<Props> = ({
         transactionDate: new Date(data.transactionDate).toISOString(),
         createdBy: creatorId,
         version: 1,
-        syncStatus: 'pending',
+        syncStatus: 'synced',
         deletedAt: null,
       });
 

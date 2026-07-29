@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useLiveQuery } from 'dexie-react-hooks';
+import { useRealtimeData } from '@/hooks/useRealtimeData';
 import { db } from '@/db/dexie';
 import { syncEngine } from '@/services/sync.service';
 import { useAuthStore } from '@/store/authStore';
@@ -30,9 +30,9 @@ export const SettingsPage: React.FC = () => {
   const [isImportOpen, setIsImportOpen] = useState(false);
   const [showResetConfirm, setShowResetConfirm] = useState(false);
 
-  const pendingSyncCount = useLiveQuery(() => db.syncQueue.count(), []) || 0;
-  const customerCount = useLiveQuery(() => db.customers.filter((c) => Boolean(c.isActive)).count(), []) || 0;
-  const transactionCount = useLiveQuery(() => db.transactions.filter((t) => t.deletedAt === null).count(), []) || 0;
+  const { customers, transactions, pendingSyncCount, refreshData } = useRealtimeData();
+  const customerCount = customers.length;
+  const transactionCount = transactions.length;
 
   const isLocalMode = env.VITE_DATA_MODE === 'local';
 
@@ -48,6 +48,7 @@ export const SettingsPage: React.FC = () => {
     try {
       setIsSyncing(true);
       const res = await syncEngine.processQueue();
+      refreshData();
       if (res.processed > 0) {
         addToast({
           type: 'success',

@@ -1,8 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useLiveQuery } from 'dexie-react-hooks';
-import { db } from '@/db/dexie';
-import { calculateShopTotals, calculateCustomerBalance } from '@/utils/balance';
+import { useRealtimeData } from '@/hooks/useRealtimeData';
 import { formatCurrency } from '@/utils';
 import { AddCustomerModal } from '../customers/AddCustomerModal';
 import { AddCreditModal } from '../transactions/AddCreditModal';
@@ -30,12 +28,7 @@ export const DashboardPage: React.FC = () => {
   const [isAddCreditOpen, setIsAddCreditOpen] = useState(false);
   const [isAddPaymentOpen, setIsAddPaymentOpen] = useState(false);
 
-  // Live queries for real-time reactivity with IndexedDB
-  const customers = useLiveQuery(() => db.customers.filter((c) => Boolean(c.isActive)).toArray(), []) || [];
-  const transactions = useLiveQuery(() => db.transactions.filter((t) => t.deletedAt === null).toArray(), []) || [];
-  const pendingSyncCount = useLiveQuery(() => db.syncQueue.count(), []) || 0;
-
-  const totals = calculateShopTotals(customers, transactions);
+  const { customers, totals, pendingSyncCount, calculateBalance } = useRealtimeData();
 
   const filteredCustomers = customers.filter((c) => {
     const query = searchQuery.toLowerCase().trim();
@@ -186,7 +179,7 @@ export const DashboardPage: React.FC = () => {
           ) : (
             <div className="grid grid-cols-2 md:grid-cols-3 gap-3.5">
               {filteredCustomers.slice(0, 8).map((customer) => {
-                const bal = calculateCustomerBalance(customer, transactions);
+                const bal = calculateBalance(customer);
                 const isFemale = customer.gender === 'female';
                 const recorderName = customer.recordedBy === 'nikhil' ? 'निखिल' : 'विवेक';
 

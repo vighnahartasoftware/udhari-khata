@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
-import { useLiveQuery } from 'dexie-react-hooks';
-import { db } from '@/db/dexie';
-import { calculateShopTotals, calculateCustomerTotals } from '@/utils/balance';
+import { useRealtimeData } from '@/hooks/useRealtimeData';
+import { calculateCustomerTotals } from '@/utils/balance';
 import { formatCurrency } from '@/utils';
 import { exportCustomersToCSV } from '@/utils/csvExport';
 import { useToastStore } from '@/components/feedback/ToastStore';
@@ -20,10 +19,7 @@ export const ReportsPage: React.FC = () => {
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
 
-  const customers = useLiveQuery(() => db.customers.filter((c) => Boolean(c.isActive)).toArray(), []) || [];
-  const transactions = useLiveQuery(() => db.transactions.filter((t) => t.deletedAt === null).toArray(), []) || [];
-
-  const shopTotals = calculateShopTotals(customers, transactions);
+  const { customers, transactions, totals: shopTotals } = useRealtimeData();
 
   const filteredTransactions = transactions.filter((t) => {
     if (!startDate && !endDate) return true;

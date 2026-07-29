@@ -1,12 +1,11 @@
 import React, { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { useLiveQuery } from 'dexie-react-hooks';
-import { db } from '@/db/dexie';
+import { useRealtimeData } from '@/hooks/useRealtimeData';
 import { calculateCustomerTotals } from '@/utils/balance';
 import { formatCurrency } from '@/utils';
 import { exportCustomerLedgerToCSV } from '@/utils/csvExport';
-import { localCustomerRepository } from '@/services/customer.local.repository';
-import { localTransactionRepository } from '@/services/transaction.local.repository';
+import { deleteCustomer } from '@/services/customerService';
+import { deleteTransaction } from '@/services/transactionService';
 import { AddCreditModal } from '../transactions/AddCreditModal';
 import { AddPaymentModal } from '../transactions/AddPaymentModal';
 import { useToastStore } from '@/components/feedback/ToastStore';
@@ -36,15 +35,12 @@ export const CustomerDetailPage: React.FC = () => {
   const [deletingTxnId, setDeletingTxnId] = useState<string | null>(null);
   const [isDeleteCustomerOpen, setIsDeleteCustomerOpen] = useState(false);
 
-  const customer = useLiveQuery(
-    () => (customerId ? db.customers.get(customerId) : undefined),
-    [customerId]
-  );
+  const { customers, transactions } = useRealtimeData();
 
-  const allTransactions = useLiveQuery(
-    () => (customerId ? localTransactionRepository.getByCustomerId(customerId) : []),
-    [customerId]
-  ) || [];
+  const customer = customers.find((c) => c.id === customerId);
+  const allTransactions = transactions
+    .filter((t) => t.customerId === customerId)
+    .sort((a, b) => new Date(b.transactionDate).getTime() - new Date(a.transactionDate).getTime());
 
   if (!customer) {
     return (
@@ -66,7 +62,7 @@ export const CustomerDetailPage: React.FC = () => {
 
   const handleDeleteTransaction = async (id: string) => {
     try {
-      await localTransactionRepository.deleteSoft(id);
+      await deleteTransaction(id);
       addToast({
         type: 'success',
         message: 'नोंद काढून टाकली. (Transaction deleted)',
@@ -80,7 +76,7 @@ export const CustomerDetailPage: React.FC = () => {
 
   const handleDeleteCustomerAccount = async () => {
     try {
-      await localCustomerRepository.delete(customer.id);
+      await deleteCustomer(customer.id);
       addToast({
         type: 'success',
         message: `ग्राहक '${customer.name}' चे खाते डीलीट झाले!`,

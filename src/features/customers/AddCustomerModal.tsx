@@ -3,7 +3,7 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { X, UserPlus, Camera, Trash2, UserCheck } from 'lucide-react';
-import { localCustomerRepository } from '@/services/customer.local.repository';
+import { createCustomer } from '@/services/customerService';
 import { useAuthStore } from '@/store/authStore';
 import { useToastStore } from '@/components/feedback/ToastStore';
 
@@ -76,7 +76,7 @@ export const AddCustomerModal: React.FC<Props> = ({ isOpen, onClose, onSuccess }
   const onSubmit = async (data: CustomerFormData) => {
     try {
       const creatorId = user?.id || globalThis.crypto.randomUUID();
-      await localCustomerRepository.create({
+      await createCustomer({
         id: globalThis.crypto.randomUUID(),
         name: data.name.trim(),
         alternateName: data.alternateName?.trim() || null,
@@ -90,7 +90,7 @@ export const AddCustomerModal: React.FC<Props> = ({ isOpen, onClose, onSuccess }
         isActive: true,
         createdBy: creatorId,
         version: 1,
-        syncStatus: 'pending',
+        syncStatus: 'synced',
       });
 
       addToast({

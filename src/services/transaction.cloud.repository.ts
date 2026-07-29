@@ -42,6 +42,7 @@ export class CloudTransactionRepository implements TransactionRepository {
         amount: data.amount,
         payment_mode: data.paymentMode,
         description: data.description,
+        recorded_by: data.recordedBy || null,
         transaction_date: data.transactionDate,
         created_by: data.createdBy,
         version: data.version,
@@ -59,6 +60,7 @@ export class CloudTransactionRepository implements TransactionRepository {
     if (updates.amount !== undefined) updateData.amount = updates.amount;
     if (updates.paymentMode !== undefined) updateData.payment_mode = updates.paymentMode;
     if (updates.description !== undefined) updateData.description = updates.description;
+    if (updates.recordedBy !== undefined) updateData.recorded_by = updates.recordedBy;
     if (updates.transactionDate !== undefined) updateData.transaction_date = updates.transactionDate;
     if (updates.version !== undefined) updateData.version = updates.version;
 
@@ -89,6 +91,7 @@ export class CloudTransactionRepository implements TransactionRepository {
       amount: Number(row.amount || 0),
       paymentMode: (row.payment_mode as PaymentMode | null) || null,
       description: row.description ? String(row.description) : null,
+      recordedBy: row.recorded_by ? String(row.recorded_by) : null,
       transactionDate: String(row.transaction_date),
       createdBy: String(row.created_by),
       createdAt: String(row.created_at),
